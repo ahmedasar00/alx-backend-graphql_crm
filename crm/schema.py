@@ -161,7 +161,7 @@ class BulkCreateCustomers(graphene.Mutation):
         except IntegrityError as exc:
             errors.append(f"Database error: {str(exc)}")
         Customer.save()
-        return BulkCreateCustomers(customers=created, errors=errors or None)
+        return BulkCreateCustomers(customers=created)
 
 
 class Mutation(graphene.ObjectType):
