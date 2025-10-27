@@ -58,7 +58,7 @@ class CreateCustomer(graphene.Mutation):
     errors = graphene.List(graphene.String)
 
     @classmethod
-    def muutate(cls, root, info, input):
+    def mutate(cls, root, info, input):
         errors = []
 
         try:
@@ -66,6 +66,7 @@ class CreateCustomer(graphene.Mutation):
         except DjangoValidationError:
             errors.append("Invalid email format.")
             return CreateCustomer(customer=None, message="", errors=errors)
+
         if input.phone:
             phone_validator = RegexValidator(
                 regex=r"^(\+\d{7,15}|\d{3}-\d{3}-\d{4})$",
@@ -78,20 +79,23 @@ class CreateCustomer(graphene.Mutation):
                     "Invalid phone number format. Use +1387986981 or 432-234-3232."
                 )
                 return CreateCustomer(customer=None, message="", errors=errors)
+
         if Customer.objects.filter(email=input.email).exists():
             errors.append("Email already exists.")
             return CreateCustomer(customer=None, message="", errors=errors)
 
         try:
-            Customer = Customer.objects.craate(
+            customer = Customer.objects.create(
                 name=input.name, email=input.email, phone=input.phone
             )
+            customer.save()
         except Exception as exc:
             errors.append(f"Failed to create customer: {str(exc)}")
             return CreateCustomer(customer=None, message="", errors=errors)
 
-        Customer.save()
-        return CreateCustomer(customer=Customer)
+        return CreateCustomer(
+            customer=customer, message="Customer created successfully.", errors=None
+        )
 
 
 # Bulk create customers
@@ -159,7 +163,7 @@ class BulkCreateCustomers(graphene.Mutation):
         except IntegrityError as exc:
             errors.append(f"Database error: {str(exc)}")
         Customer.save()
-        return BulkCreateCustomers(customers=created)
+        return BulkCreateCustomers(customers=created, errors=errors or None)
 
 
 class Mutation(graphene.ObjectType):
