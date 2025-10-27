@@ -91,9 +91,7 @@ class CreateCustomer(graphene.Mutation):
             return CreateCustomer(customer=None, message="", errors=errors)
 
         Customer.save()
-        return CreateCustomer(
-            customer=Customer, message="Customer created successfully.", errors=None
-        )
+        return CreateCustomer(customer=Customer)
 
 
 # Bulk create customers
