@@ -1,9 +1,11 @@
 import graphene
 from graphene_django import DjangoObjectType
-from crm.schema import Query as CRMQuery, Mutation as CRMMutation
+from .models import Customer, Product, Order
+from django.core.validators import validate_email, RegexValidator
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 
-# Types
+# ? Types
 
 from crm.models import Customer, Product, Order
 
@@ -20,17 +22,13 @@ class ProductType(DjangoObjectType):
         fields = "__all__"
 
 
-class OrdereType(DjangoObjectType):
+class OrderType(DjangoObjectType):
     class Meta:
         model = Order
         fields = "__all__"
 
 
-class Query(CRMQuery, graphene.ObjectType):
-    pass
-
-
-#! Inputs
+# ? Inputs
 class CustomerInput(graphene.InputObjectType):
     name = graphene.String(required=True)
     email = graphene.String(required=True)
@@ -49,9 +47,64 @@ class OrderInput(graphene.InputObjectType):
     order_date = graphene.types.datetime.DateTime(required=False)
 
 
-#!  QUERIES
+##? Mutations
+class CreateCustomer(graphene.Mutation):
+    class Arguments:
+        input = CustomerInput(required=True)
+
+    customer = graphene.Field(CustomerType)
+    message = graphene.String()
+    errors = graphene.List(graphene.String)
+
+    @classmethod
+    def muutate(cls, root, info, input):
+        errors = []
+
+        try:
+            validate_email(input.email)
+        except DjangoValidationError:
+            errors.append("Invalid email format.")
+            return CreateCustomer(customer=None, message="", errors=errors)
+        if input.phone:
+            phone_validator = RegexValidator(
+                regex=r"^(\+\d{7,15}|\d{3}-\d{3}-\d{4})$",
+                message="Phone must be like +1234567890 or 123-456-7890",
+            )
+            try:
+                phone_validator(input.phone)
+            except DjangoValidationError:
+                errors.append(
+                    "Invalid phone number format. Use +1387986981 or 432-234-3232."
+                )
+                return CreateCustomer(customer=None, message="", errors=errors)
+        if Customer.objects.filter(email=input.email).exists():
+            errors.append("Email already exists.")
+            return CreateCustomer(customer=None, message="", errors=errors)
+
+        try:
+            Customer = Customer.objects.craate(
+                name=input.name, email=input.email, phone=input.phone
+            )
+        except Exception as exc:
+            errors.append(f"Failed to create customer: {str(exc)}")
+            return CreateCustomer(customer=None, message="", errors=errors)
+
+        return CreateCustomer(
+            customer=Customer, message="Customer created successfully.", errors=None
+        )
+
+
+# ?  QUERIES
 class Query(graphene.ObjectType):
     all_customers = graphene.List(CustomerType)
+    all_products = graphene.List(ProductType)
+    all_orders = graphene.List(OrderType)
 
     def resolve_all_customers(root, info):
         return Customer.objects.all()
+
+    def resolve_all_products(root, info):
+        return Product.objects.all()
+
+    def resolve_all_orders(root, info):
+        return Order.objects.all()
