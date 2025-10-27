@@ -3,6 +3,7 @@ from graphene_django import DjangoObjectType
 from .models import Customer, Product, Order
 from django.core.validators import validate_email, RegexValidator
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction, IntegrityError
 
 
 # ? Types
@@ -92,6 +93,71 @@ class CreateCustomer(graphene.Mutation):
         return CreateCustomer(
             customer=Customer, message="Customer created successfully.", errors=None
         )
+
+
+# Bulk create customers
+class BulkCreateCustomers(graphene.Mutation):
+    class Arguments:
+        inputs = graphene.List(CustomerInput, required=True)
+
+    customer = graphene.List(CustomerType)
+    errors = graphene.List(graphene.String)
+
+    @classmethod
+    def mutate(cls, root, info, inputs):
+        created = []
+        errors = []
+        seen_emails = set()
+        valid_entries = []
+
+        for index, data in enumerate(inputs):
+            row = index + 1
+            if not data.email:
+                errors.append(f"Row {row}: Email is required.")
+                continue
+
+            try:
+                validate_email(data.email)
+            except DjangoValidationError:
+                errors.append(f"Row {row}: invalid email format ({data.email}).")
+                continue
+
+            if (
+                data.email in seen_emails
+                or Customer.objects.filter(email=data.email).exists()
+            ):
+                errors.append(f"Row {row}: Email already exists ({data.email}).")
+                continue
+
+            if data.phone:
+                phone_validator = RegexValidator(
+                    regex=r"^(\+\d{7,15}|\d{3}-\d{3}-\d{4})$",
+                    message="Phone must be like +1234567890 or 123-456-7890",
+                )
+
+                try:
+                    phone_validator(data.phone)
+                except DjangoValidationError:
+                    errors.append(
+                        f"Row {row}: Invalid phone number format ({data.phone})."
+                    )
+                    continue
+
+            seen_emails.add(data.email)
+            valid_entries.append(data)
+
+        # Create valid entries
+        try:
+            with transaction.atomic():
+                for data in valid_entries:
+                    c = Customer.objects.create(
+                        name=data.name, email=data.email, phone=data.phone
+                    )
+                    created.append(c)
+        except IntegrityError as exc:
+            errors.append(f"Database error: {str(exc)}")
+
+        return BulkCreateCustomers(customers=created, errors=errors or None)
 
 
 # ?  QUERIES
