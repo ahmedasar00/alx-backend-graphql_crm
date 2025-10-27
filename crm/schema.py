@@ -110,12 +110,14 @@ class BulkCreateCustomers(graphene.Mutation):
         seen_emails = set()
         valid_entries = []
 
+        # ? Validate data
         for index, data in enumerate(inputs):
             row = index + 1
             if not data.email:
                 errors.append(f"Row {row}: Email is required.")
                 continue
 
+            # ? Validate email format
             try:
                 validate_email(data.email)
             except DjangoValidationError:
@@ -129,6 +131,7 @@ class BulkCreateCustomers(graphene.Mutation):
                 errors.append(f"Row {row}: Email already exists ({data.email}).")
                 continue
 
+            # ? Validate phone if provided
             if data.phone:
                 phone_validator = RegexValidator(
                     regex=r"^(\+\d{7,15}|\d{3}-\d{3}-\d{4})$",
@@ -146,7 +149,7 @@ class BulkCreateCustomers(graphene.Mutation):
             seen_emails.add(data.email)
             valid_entries.append(data)
 
-        # Create valid entries
+        # ? Create valid entries
         try:
             with transaction.atomic():
                 for data in valid_entries:
@@ -160,7 +163,14 @@ class BulkCreateCustomers(graphene.Mutation):
         return BulkCreateCustomers(customers=created, errors=errors or None)
 
 
+class Mutation(graphene.ObjectType):
+    create_customer = CreateCustomer.Field()
+    bulk_create_customers = BulkCreateCustomers.Field()
+
+
 # ?  QUERIES
+
+
 class Query(graphene.ObjectType):
     all_customers = graphene.List(CustomerType)
     all_products = graphene.List(ProductType)
