@@ -4,13 +4,13 @@ from .models import Customer, Product, Order
 from django.core.validators import validate_email, RegexValidator
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction, IntegrityError
+from graphene_django.filter import DjangoFilterConnectionField
+
 # from .mutations import CreateCustomer, BulkCreateCustomers
-
-# ? Types
-
 from crm.models import Customer, Product, Order
 
 
+# ? Types
 class CustomerType(DjangoObjectType):
     class Meta:
         model = Customer
