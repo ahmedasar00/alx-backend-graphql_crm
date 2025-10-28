@@ -30,7 +30,7 @@ The primary objective of this task is to configure a new Django project (`alx-ba
     cd alx-backend-graphql_crm
 
     # If starting from scratch
-    django-admin startproject alx-backend-graphql_crm
+    django-admin startproject alx-backend-graphql
     cd alx-backend-graphql_crm
     python manage.py startapp crm
     ```
